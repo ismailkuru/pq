@@ -1,0 +1,3 @@
+PKG unix,threads
+B +threads
+# FLG -I +threads -thread

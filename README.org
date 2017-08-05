@@ -1,0 +1,5 @@
+* pq: a persistent queue in OCaml
+
+Currently undergoing redevelopment.
+
+TODO: currently quite slow... why?

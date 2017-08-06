@@ -1,6 +1,6 @@
 SHELL:=bash
 
-opt:=ocamlfind ocamlopt -thread -package tjr_pq
+opt:=ocamlfind ocamlopt -noassert -thread -package tjr_pq
 
 all:
 	$(opt) -linkpkg -o sender shared.ml sender.ml 

@@ -2,12 +2,49 @@
 
 open Pq_pervasive
 
-type conn = Unix.file_descr
-
 let log_exn loc e = print_endline @@ loc^": "^(Printexc.to_string e)
 let log_if_some loc = function
   | None -> ()
   | Some e -> log_exn loc e
+
+
+let can_recv ~conn =
+  try
+    let (r,_,_) = Unix.select [conn] [] [] 0.0 in
+    not (r=[])
+  with e -> (
+      log_exn __LOC__ e;
+      raise (Pq_exc __LOC__))
+
+
+let p = mk_profiler ()
+let unix_read_p = p
+
+(* repeatedly read until all read, or exception; buf is filled from 0; assume len < |buf| *)
+let unix_read ~conn ~buf ~len = 
+  let rec f off = 
+    assert (p.mark' P.ab);
+    assert(off <=len);
+    if (off=len) then () else
+      begin
+        assert (p.mark' P.bc);
+        (* while (not (can_recv conn)) do Thread.delay 0.000001 done;  (* ! *) *)
+        assert(p.mark' P.cd);
+        Unix.read conn buf off (len-off) |> fun nread ->
+        assert(p.mark' P.de);
+        assert(nread>0);
+        f (off+nread)
+      end
+  in
+  f 0
+
+
+
+
+
+
+
+type conn = Unix.file_descr
 
 
 (* accept connections for this quad only *)
@@ -69,22 +106,20 @@ let connect ~quad =
   | (None,None) -> assert false (* can't happen *)
   | (None,Some c) -> c
 
-let write_length ~conn ~len = (
-  i2bs len |> fun bs ->  
-  Unix.write conn bs 0 4 |> fun n ->
-  assert(n=4);
-  ())
 
-(* send length as 4 bytes, then the string itself *)
+(* send length as 4 bytes, then the string itself; NOTE it is quite
+   important to try to call write with a buffer which includes everything
+   to do with the message *)
 let send_string ~conn ~string_ : unit =
   let err = 
     try
-      (* write length *)
       String.length string_ |> fun len ->
-      write_length ~conn ~len |> fun () ->
-      (* now write the string itself *)
-      Unix.write conn (Bytes.of_string string_) 0 len |> fun nwritten ->
-      assert(nwritten=len);
+      let buf = Bytes.create (4+len) in
+      i2bs ~buf ~off:0 len;
+      Bytes.blit_string string_ 0 buf 4 len;
+      (* now write the buffer *)
+      Unix.write conn buf 0 (4+len) |> fun nwritten ->
+      assert(nwritten=4+len);
       None
     with e -> Some e
   in
@@ -98,14 +133,6 @@ let send ~conn ~strings : unit =
   send_string ~conn ~string_
 
 
-let can_recv ~conn =
-  try
-    let (r,_,_) = Unix.select [conn] [] [] 0.0 in
-    not (r=[])
-  with e -> (
-      log_exn __LOC__ e;
-      raise (Pq_exc __LOC__))
-
 let p = mk_profiler ()
 let read_length_p = p
 
@@ -115,7 +142,7 @@ let read_length ~conn : int = (
   assert (p.mark' P.fg);
   unix_read ~conn ~buf ~len:4 |> fun () ->  (* ! *)
   assert (p.mark' P.gh);
-  bs2i buf |> fun i ->
+  bs2i ~buf ~off:0 |> fun i ->
   assert (p.mark' P.hi);
   i)
 
@@ -128,12 +155,12 @@ let recv_string ~conn : string =
     try
       (* read length *)
       assert (p.mark' P.ab);
-      read_length ~conn |> fun len ->  (* ! *)
+      read_length ~conn |> fun len ->  (* ! slow a bit *)
       assert (p.mark' P.bc);
       (* now read the string *)
       Bytes.create len |> fun buf ->          
       assert (p.mark' P.cd);
-      unix_read ~conn ~buf ~len |> fun () ->  (* ! *)
+      unix_read ~conn ~buf ~len |> fun () ->  (* !really slow *)
       assert (p.mark' P.de);      
       s:=Some(Bytes.unsafe_to_string buf);
       None

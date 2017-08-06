@@ -2,7 +2,7 @@ SHELL:=bash
 
 libname:=tjr_pq
 mls:=pq_pervasive.ml pq_connection.ml pq.ml
-pkg:=-thread -package core,unix,threads,extunix,tjr_lib
+pkg:=-thread -noassert -package core,unix,threads,extunix,tjr_lib
 
 
 all:

@@ -13,11 +13,7 @@ let main () =
     (* dummy message: pid and a counter *)
     let msg = pid ^" "^(string_of_int !i) in
     if !i mod 100 = 0 then print_endline msg else ();
-    begin
-      try send sq msg with 
-	    (*| File.Exception -> (print_string "sender.ml: File.Exception\n"; raise File.Exception) *)
-	    | e -> (print_string "sender.ml: unknown exception\n"; raise e)
-    end;
+    send sq msg;
     i := !i + 1;
 (*    if !i = 10000 then
       (print_profile (Pq.sender_thread_p.get()); failwith __LOC__) else ()      *)

@@ -101,7 +101,6 @@ let recv_thread q =
         send (dest_Some !(q.fd)) [string_of_bool !(q.b)];
         assert (p.mark' P.bc);
         private_receive q;
-        Thread.delay (0.000001);
       done
     with 
     | Pq_exc e -> (
@@ -198,7 +197,6 @@ let sender_thread q =
         assert(p.mark' P.bc);
         _sender_recv q; (* ! *)
         assert(p.mark' P.cd);
-        if !(q.msgs) = [] then Thread.delay (0.000001) else ();
       done
     with 
     | Pq_exc e -> ( 
@@ -223,8 +221,8 @@ let send q s =
   Condition.broadcast q.cond;
   Mutex.unlock q.lock;
   maybe_raise e;
-  (* sender throttling *)
-  if l > 10 then 
+  (* sender throttling; allow sender to run 1000 msgs in front *)
+  if l > 1000 then 
     (float_of_int l) /. 10000.0 |> fun secs ->
     Thread.delay secs (* FIXME *)
   else ()

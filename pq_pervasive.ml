@@ -22,39 +22,23 @@ let maybe_raise e = match e with None -> () | Some e -> raise e
 
 (* int <-> byte_x4 conversion *)
 
-let i2bs i = 
+let i2bs ~buf ~off i = 
   assert (i>=0);
-  Bytes.create 4 |> fun buf ->
   let i = ref i in
   for j = 0 to 3 do
-    Bytes.set buf j ((!i) mod 256 |> Char.chr);
+    Bytes.set buf (off+j) ((!i) mod 256 |> Char.chr);
     i:=!i / 256
   done;
-  buf
+  ()
 
-let bs2i buf = 
-  assert(Bytes.length buf = 4);
+let bs2i ~buf ~off = 
+  assert(Bytes.length buf >= 4+off);
   let i = ref 0 in
   for j = 3 downto 0 do
-    Bytes.get buf j |> Char.code |> fun x ->
+    Bytes.get buf (off+j) |> Char.code |> fun x ->
     i:=256*(!i) + x;
   done;
   (!i)
-
-
-(* repeatedly read until all read, or exception; buf is filled from 0; assume len < |buf| *)
-let unix_read ~conn ~buf ~len = 
-  let rec f off = 
-    assert(off <=len);
-    if (off=len) then () else
-      Unix.read conn buf off (len-off) |> fun nread ->
-      assert(nread>0);
-      f (off+nread)
-  in
-  f 0
-
-
-
 
 
 exception Pq_exc of string

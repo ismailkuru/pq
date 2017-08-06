@@ -3,31 +3,30 @@
 open Pq_pervasive
 open Pq_connection
 
-let maybe_raise e = match e with | None -> () | Some e -> raise e;;
-
+let maybe_raise e = match e with None -> () | Some e -> raise e
 
 type queue = { 
   (* shared state *)
-  lock : Mutex.t ;
-  cond : Condition.t ;
-  msgs : (string list) ref ;
+  lock : Mutex.t;
+  cond : Condition.t;
+  msgs : (string list) ref;
   (* active thread local state *)
-  b    : bool ref ;
-  fd   : conn option ref ;
+  b    : bool ref;
+  fd   : conn option ref;
   (* constant *)
-  quad : quad ;
-  fn   : string ;
+  quad : quad;
+  fn   : string;
 }
 
 
 let mk_queue ~quad ~fn ~is_sender = { 
-  lock = Mutex.create () ;
-  cond = Condition.create () ;
-  msgs = ref [] ;
-  b    = ref is_sender ;
-  fd   = ref None ;
-  quad = quad ;
-  fn   = fn ;
+  lock = Mutex.create ();
+  cond = Condition.create ();
+  msgs = ref [];
+  b    = ref is_sender;
+  fd   = ref None;
+  quad = quad;
+  fn   = fn;
 }
 
 (* assumes q.lock is held *)
@@ -35,7 +34,7 @@ let save (q:queue) = None
 (* TODO
   let b = string_of_bool ( ! ( q.b ) ) in
   try 
-    File.write q.fn ( b :: ( ! ( q.msgs ) ) ) ; None
+    File.write q.fn ( b :: ( ! ( q.msgs ) ) ); None
   with 
   | File.Exception -> Some File.Exception in
 *)
@@ -59,23 +58,34 @@ let init q = ()
 
 (* receiver --------------------------------------------------------- *)
 
+let p = mk_profiler ()
+let private_receive_p = p
+
 (* receive.broadcast/remove.wait,peek.wait *)
 (* throws File.Exception Messaging.Exception *)
 let private_receive q =
+  assert (p.mark' P.cd);
   let [b;msg] = recv (dest_Some !(q.fd)) in
+  assert (p.mark' P.de);
   match bool_of_string b = not !(q.b) with
   | true -> (
     debug "receiver got a valid msg\n";
     Mutex.lock q.lock;
+    assert (p.mark' P.ef);
     q.msgs := !(q.msgs)@[msg];
     q.b := not !(q.b);
     let e = save q in
     Condition.broadcast q.cond;
+    assert (p.mark' P.fg);
     (* FIXME are we sure this above has to be inside the lock? why not in private_send? *)
     Mutex.unlock q.lock;
+    assert (p.mark' P.gh);
     maybe_raise e)
   | false -> ()[@@warning "-8"]
 
+
+let p = mk_profiler ()
+let recv_thread_p = p
 
 (* receiver.signal/listen.wait - no other threads have access yet *)
 (* throws File.Exception *)
@@ -83,24 +93,29 @@ let recv_thread q =
   while true do
     try 
       print_endline "receiver: initializing"; 
-      q.fd := Some(listen q.quad);
+      q.fd := Some(listen_accept q.quad);
+      (* for non-persistent version, always reinit q.b FIXME*)
+      q.b := false;
       while true do
-        private_receive q; 
+        assert (p.mark' P.ab);
         send (dest_Some !(q.fd)) [string_of_bool !(q.b)];
+        assert (p.mark' P.bc);
+        private_receive q;
+        Thread.delay (0.000001);
       done
     with 
-    | Exception e -> (
+    | Pq_exc e -> (
         print_endline @@ __LOC__^": recv_thread: "^e;
         match !(q.fd) with 
         | None -> () 
         | Some fd ->
-          close_no_err fd;
+          pq_close_noerr fd;
           q.fd := None)
     | e -> (
         print_endline @@ __LOC__ ^ "recv_thread: unknown exception";
         raise e)
     (*    | File.Exception -> (
-            print_string "receiver: File.Exception\n" ;
+            print_string "receiver: File.Exception\n";
             raise File.Exception ) TODO *)
   done
 
@@ -142,20 +157,20 @@ let listen quad fn =
 
 (* locking used only for communication; note safe interference- q.msgs
    accessed outside lock (we do not require all shared state to be
-   welllocked) *)
+   welllocked); FIXME moved "let msgs" inside lock for time being *)
 (* send_msg.wait/send.signal *)
 (* throws Exception *)
 let _send q =
   Mutex.lock q.lock;
   while !(q.msgs) = [] do Condition.wait q.cond q.lock done;
-  Mutex.unlock q.lock;
   let msgs = [string_of_bool !(q.b); List.hd !(q.msgs)] in
+  Mutex.unlock q.lock;
   send (dest_Some !(q.fd)) msgs
 
 (* throws File.Exception Exception *)
 let _sender_recv q = 
-  let msg = List.hd (recv (dest_Some (!(q.fd)))) in
-  match !(q.b)  = bool_of_string msg with
+  let msg = List.hd (recv (dest_Some !(q.fd))) in
+  match !(q.b) = bool_of_string msg with
   | true -> (
       Mutex.lock q.lock;
       q.msgs := List.tl !(q.msgs);
@@ -165,6 +180,9 @@ let _sender_recv q =
       maybe_raise e)
   | false -> ()
 
+let p = mk_profiler ()
+let sender_thread_p = p
+
 (* throws File.Exception *)
 let sender_thread q =
   debug "sender starts\n";
@@ -172,18 +190,26 @@ let sender_thread q =
     try
       print_endline "sender: initializing"; 
       q.fd := Some(connect q.quad); 
+      (* for non-persistent version, always reinit q.b *)
+      q.b := true;
       while true do
-        _send q;
-        _sender_recv q 
+        assert(p.mark' P.ab);
+        _send q;  (* ! *)
+        assert(p.mark' P.bc);
+        _sender_recv q; (* ! *)
+        assert(p.mark' P.cd);
+        if !(q.msgs) = [] then Thread.delay (0.000001) else ();
       done
     with 
-    | Exception e -> ( 
+    | Pq_exc e -> ( 
         print_endline @@ __LOC__^"sender_thread: "^e;
         match !(q.fd) with 
         | None -> () 
-        | Some fd -> close_no_err fd; q.fd := None)
+        | Some fd -> pq_close_noerr fd; q.fd := None)
     (* debug    | File.Exception -> ( raise File.Exception ) *)
-    | e -> raise e
+    | e -> (
+        print_endline @@ __LOC__^"sender_thread, unknown exception: "^(Printexc.to_string e);
+        raise e)
   done
 
 (* FIXME check that broadcast does not have to be inside the locked region *)
@@ -193,13 +219,15 @@ let send q s =
   Mutex.lock q.lock;
   q.msgs := !(q.msgs)@[s];
   let e = save q in
-  Mutex.unlock q.lock;
+  let l = List.length !(q.msgs) in
   Condition.broadcast q.cond;
+  Mutex.unlock q.lock;
   maybe_raise e;
   (* sender throttling *)
-  let l = List.length !(q.msgs) in
-  (float_of_int l) /. 1000.0 |> fun secs ->
-  Thread.delay secs
+  if l > 10 then 
+    (float_of_int l) /. 10000.0 |> fun secs ->
+    Thread.delay secs (* FIXME *)
+  else ()
 
 let connect quad fn = 
   debug "_connect 1\n";

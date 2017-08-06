@@ -18,7 +18,9 @@ let main () =
 	    (*| File.Exception -> (print_string "sender.ml: File.Exception\n"; raise File.Exception) *)
 	    | e -> (print_string "sender.ml: unknown exception\n"; raise e)
     end;
-    i := !i + 1
+    i := !i + 1;
+(*    if !i = 10000 then
+      (print_profile (Pq.sender_thread_p.get()); failwith __LOC__) else ()      *)
   done
 
 let _ = main()

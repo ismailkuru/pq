@@ -1,6 +1,6 @@
 name="tjr_pq"
 description="Persistent queue in OCaml"
 version="??"
-requires="threads"
+requires="core,unix,threads,extunix,tjr_lib"
 archive(byte)="tjr_pq.cma"
 archive(native)="tjr_pq.cmxa"

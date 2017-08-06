@@ -1,3 +1,3 @@
-PKG unix,threads
+PKG core unix threads extunix tjr_lib
 B +threads
 # FLG -I +threads -thread

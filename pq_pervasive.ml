@@ -1,3 +1,5 @@
+include Tjr_profile
+
 let print_string s = 
   print_string s; 
   flush stdout
@@ -16,11 +18,6 @@ let is_Some e = match e with Some e -> true | _ -> false
 let dest_Some e = match e with Some e -> e | _ -> failwith "dest_Some"
 let maybe_raise e = match e with None -> () | Some e -> raise e
 
-
-let close_fd_noerr fd = 
-  try Unix.close fd 
-  with e -> 
-    print_endline @@ __LOC__^": close_fd_noerr: "^(Printexc.to_string e)
 
 
 (* int <-> byte_x4 conversion *)
@@ -45,7 +42,7 @@ let bs2i buf =
   (!i)
 
 
-(* repeatedly read until all read, or exception *)
+(* repeatedly read until all read, or exception; buf is filled from 0; assume len < |buf| *)
 let unix_read ~conn ~buf ~len = 
   let rec f off = 
     assert(off <=len);
@@ -56,4 +53,21 @@ let unix_read ~conn ~buf ~len =
   in
   f 0
 
+
+
+
+
+exception Pq_exc of string
+
+let pq_close_noerr fd = 
+  try Unix.close fd 
+  with e -> 
+    print_endline @@ __LOC__^": pq_close_noerr: "^(Printexc.to_string e)
+
+
+let pq_close ~conn = 
+  try Unix.close conn 
+  with e -> 
+    print_endline @@ __LOC__^": pq_close: "^(Printexc.to_string e);
+    raise (Pq_exc __LOC__)
 

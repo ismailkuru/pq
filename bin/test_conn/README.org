@@ -1,0 +1,9 @@
+Simple test of connections. Start receiver first, then sender. FIXME
+can probably remove some of the Thread.delays.
+
+FIXME receiver sometimes dies with "Fatal error: out of memory."; but
+it doesn't look like any memory is being used... except in the network
+connection buffer?
+
+If we ping back from the receiver then everything is very slow
+again. Round-trip latency? Not sure what the problem is. 

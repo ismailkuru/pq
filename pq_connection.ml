@@ -24,15 +24,15 @@ let unix_read_p = p
 let unix_read ~conn ~buf ~len = 
   let rec f off = 
     assert (p.mark' P.ab);
-    assert(off <=len);
+    assert_(off <=len);
     if (off=len) then () else
       begin
         assert (p.mark' P.bc);
         (* while (not (can_recv conn)) do Thread.delay 0.000001 done;  (* ! *) *)
-        assert(p.mark' P.cd);
+        assert (p.mark' P.cd);
         Unix.read conn buf off (len-off) |> fun nread ->
-        assert(p.mark' P.de);
-        assert(nread>0);
+        assert (p.mark' P.de);
+        assert_(nread>0);  (* this needs to be checked always, otherwise possibility of loop *)
         f (off+nread)
       end
   in
@@ -119,7 +119,7 @@ let send_string ~conn ~string_ : unit =
       Bytes.blit_string string_ 0 buf 4 len;
       (* now write the buffer *)
       Unix.write conn buf 0 (4+len) |> fun nwritten ->
-      assert(nwritten=4+len);
+      assert_(nwritten=4+len);
       None
     with e -> Some e
   in

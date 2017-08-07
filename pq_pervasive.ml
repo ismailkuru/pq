@@ -8,6 +8,8 @@ let print_endline s = print_string @@ s^"\n"
 
 let debug s = () (* print_string s *)
 
+(* assert that is always checked *)
+let assert_ b = if b then () else assert false
 
 type conn = Unix.file_descr
 type ip = Unix.inet_addr
@@ -23,7 +25,7 @@ let maybe_raise e = match e with None -> () | Some e -> raise e
 (* int <-> byte_x4 conversion *)
 
 let i2bs ~buf ~off i = 
-  assert (i>=0);
+  assert_ (i>=0);
   let i = ref i in
   for j = 0 to 3 do
     Bytes.set buf (off+j) ((!i) mod 256 |> Char.chr);
@@ -32,7 +34,7 @@ let i2bs ~buf ~off i =
   ()
 
 let bs2i ~buf ~off = 
-  assert(Bytes.length buf >= 4+off);
+  assert_ (Bytes.length buf >= 4+off);
   let i = ref 0 in
   for j = 3 downto 0 do
     Bytes.get buf (off+j) |> Char.code |> fun x ->

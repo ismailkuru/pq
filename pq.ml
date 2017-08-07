@@ -161,6 +161,8 @@ let listen quad fn =
 (* throws Exception *)
 let _send q =
   Mutex.lock q.lock;
+  (* FIXME possible that the internal thread gets stuck here? but then
+     attempting to send another msg should wake the internal thread *)
   while !(q.msgs) = [] do Condition.wait q.cond q.lock done;
   let msgs = [string_of_bool !(q.b); List.hd !(q.msgs)] in
   Mutex.unlock q.lock;

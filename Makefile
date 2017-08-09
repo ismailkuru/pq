@@ -1,7 +1,7 @@
 SHELL:=bash
 
 libname:=tjr_pq
-mls:=pq_pervasive.ml pq_connection.ml pq.ml
+mls:=net_pervasive.ml listen.ml connect.ml send_recv.ml msg_queue.ml # pq.ml
 pkg:=-thread -noassert -package core,unix,threads,extunix,tjr_lib
 
 
@@ -13,10 +13,10 @@ all:
 	-ocamlfind remove $(libname)
 	ocamlfind install $(libname) META *.cmi *.o *.a *.cma *.cmxa *.cmo *.cmx 
 	$(MAKE) -C bin/test_conn
-	$(MAKE) -C bin/test_pq
+	$(MAKE) -C bin/test_mq
 
 clean:
 	rm -f *.{cmi,cmo,cmx,o,a,cmxa,cma}
 	$(MAKE) -C bin/test_conn clean
-	$(MAKE) -C bin/test_pq clean
+	$(MAKE) -C bin/test_mq clean
 

@@ -1,9 +1,9 @@
 (* persistent queue; currently not persistent :( *)
 
-open Pq_pervasive
-open Pq_connection
+(* FIXME we need to specialize quad to local/remote *)
 
-let maybe_raise e = match e with None -> () | Some e -> raise e
+open Pq_pervasive
+open Send_recv
 
 type queue = { 
   (* shared state *)
@@ -14,7 +14,7 @@ type queue = {
   b    : bool ref;
   fd   : conn option ref;
   (* constant *)
-  quad : quad;
+  quad: quad;
   fn   : string;
 }
 
@@ -93,7 +93,7 @@ let recv_thread q =
   while true do
     try 
       print_endline "receiver: initializing"; 
-      q.fd := Some(listen_accept q.quad);
+      q.fd := Some(Listen.listen_accept q.quad);
       (* for non-persistent version, always reinit q.b FIXME*)
       q.b := false;
       while true do

@@ -14,7 +14,8 @@ let assert_ b = if b then () else assert false
 type conn = Unix.file_descr
 type ip = Unix.inet_addr
 type port = int
-type quad = ip*port*ip*port
+type ipp = Unix.sockaddr (*  expect ADDR_INET ip * port *)
+type quad = { local:ipp; remote: ipp }
 
 let is_Some e = match e with Some e -> true | _ -> false
 let dest_Some e = match e with Some e -> e | _ -> failwith "dest_Some"
@@ -56,4 +57,22 @@ let pq_close ~conn =
   with e -> 
     print_endline @@ __LOC__^": pq_close: "^(Printexc.to_string e);
     raise (Pq_exc __LOC__)
+
+
+
+let log_exn loc e = print_endline @@ loc^": "^(Printexc.to_string e)
+let log_if_some loc = function
+  | None -> ()
+  | Some e -> log_exn loc e
+
+
+let can_recv ~conn =
+  try
+    let (r,_,_) = Unix.select [conn] [] [] 0.0 in
+    not (r=[])
+  with e -> (
+      log_exn __LOC__ e;
+      raise (Pq_exc __LOC__))
+
+
 

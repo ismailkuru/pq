@@ -98,7 +98,7 @@ let recv_thread q =
       q.b := false;
       while true do
         assert (p.mark' P.ab);
-        send (dest_Some !(q.fd)) [string_of_bool !(q.b)];
+(*         send (dest_Some !(q.fd)) [string_of_bool !(q.b)]; FIXME disabling briefly *)
         assert (p.mark' P.bc);
         private_receive q;
       done
@@ -181,6 +181,16 @@ let _sender_recv q =
       maybe_raise e)
   | false -> ()
 
+(* FIXME disabling acks *)
+let _sender_recv q = 
+      Mutex.lock q.lock;
+      q.msgs := List.tl !(q.msgs);
+      q.b := not !(q.b);
+      let e = save q in
+      Mutex.unlock q.lock;
+      maybe_raise e
+
+
 let p = mk_profiler ()
 let sender_thread_p = p
 
@@ -197,7 +207,7 @@ let sender_thread q =
         assert(p.mark' P.ab);
         _send q;  (* ! *)
         assert(p.mark' P.bc);
-        _sender_recv q; (* ! *)
+        _sender_recv q; (* ! *) 
         assert(p.mark' P.cd);
       done
     with 
